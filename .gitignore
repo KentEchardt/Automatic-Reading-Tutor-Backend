@@ -7,3 +7,16 @@ static/
 media/
 .DS_Store
 *.log
+
+#Virtual Environment
+myenv/
+
+# Django specific
+*.log
+staticfiles/
+media/
+db.sqlite3
+
+# Other
+.vscode/
+.idea/
