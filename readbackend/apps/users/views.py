@@ -1,11 +1,14 @@
 from django.shortcuts import render
 from models import Users
-from faster_whisper import WhisperModel
+from transformers import Wav2Vec2Processor, Wav2Vec2ForCTC
+from datasets import load_dataset
+import torch
+
 
 # Create your views here.
 
 # Model reccomended by the Client
-model_size = "large-v3"
-model = WhisperModel(model_size, device="cpu", compute_type="int8")
+processor = Wav2Vec2Processor.from_pretrained("facebook/wav2vec2-xlsr-53-espeak-cv-ft")
+model = Wav2Vec2ForCTC.from_pretrained("facebook/wav2vec2-xlsr-53-espeak-cv-ft")
 
 
