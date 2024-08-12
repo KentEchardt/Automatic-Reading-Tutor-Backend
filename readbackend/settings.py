@@ -40,7 +40,9 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     'readbackend.apps.users',
-    
+
+   
+   
    
 
 ]

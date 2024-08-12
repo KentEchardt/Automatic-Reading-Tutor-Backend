@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Reading Session</title>
+</head>
+<body>
+    <h1>{{ story.title }}</h1>
+    <p>{{ story.content }}</p>
+
+    <form method="POST" enctype="multipart/form-data">
+        {% csrf_token %}
+        <label for="audio">Upload your reading:</label>
+        <input type="file" name="audio" accept="audio/*" required>
+        <button type="submit">Submit Audio</button>
+    </form>
+</body>
+</html>
+
+<h2>Sign Up</h2>
+<form method="post">
+    {% csrf_token %}
+    {{ form.as_p }}
+    <button type="submit">Sign Up</button>
+</form>

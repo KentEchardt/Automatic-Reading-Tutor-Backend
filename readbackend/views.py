@@ -1,5 +1,6 @@
 from django.http import JsonResponse
-from django.shortcuts import render
+from django.shortcuts import render, redirect
+from django.contrib.auth.forms import UserCreationForm
 from django.core.files.storage import FileSystemStorage
 from readbackend.apps.users.models import Stories, ReadingSession, PerformanceData
 
@@ -14,7 +15,6 @@ def user_signup(request):
     else:
         form = UserCreationForm()
     return render(request, 'signup.html', {'form': form})
-
 def reading_session(request, story_id):
     if request.method == "POST" and request.FILES.get('audio'):
         # Handle uploaded audio file
