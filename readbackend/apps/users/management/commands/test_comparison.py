@@ -12,7 +12,7 @@ class Command(BaseCommand):
         original_text = story.fulltext
         
         # Read the test audio file
-        audio_file_path = r'C:\Users\Admin\Desktop\Capstone_csc3003s\read-backend-application\readbackend\media\audio\WhatsApp Audio 2024-08-12 at 3.38.46 PM (online-audio-converter.com).mp3'
+        audio_file_path = r'C:/Users/kent1/Documents/Reading Tutor Project/read-backend-application/WhatsApp Audio 2024-08-13 at 16.11.36_a29358fe.dat'
         recognizer = sr.Recognizer()
         with sr.AudioFile(audio_file_path) as source:
             audio_data = recognizer.record(source)
@@ -26,7 +26,7 @@ class Command(BaseCommand):
                 return
         
         # Read the expected text from file
-        text_file_path = r'C:\Users\Admin\Desktop\Capstone_csc3003s\read-backend-application\readbackend\media\text\test_text.txt'
+        text_file_path = r'C:/Users/kent1/Documents/Reading Tutor Project/read-backend-application/test_document.txt'
         with open(text_file_path, 'r') as file:
             expected_text = file.read().strip()
         
