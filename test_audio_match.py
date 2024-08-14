@@ -3,7 +3,7 @@ import librosa
 from transformers import Wav2Vec2ForCTC, Wav2Vec2Processor
 import subprocess
 
-# Function to check if espeak is installed
+# Function to check if espeak-ng is installed
 def check_espeak():
     return subprocess.run(["espeak-ng", "--version"], capture_output=True, text=True).returncode == 0
 
@@ -12,29 +12,24 @@ def text_to_phonemes(text: str, language: str = "en") -> str:
     if not check_espeak():
         raise RuntimeError("eSpeak is not installed or not in PATH.")
     
-    command = f'espeak-ng -v{language} -x "{text}"'
+    command = f'espeak-ng -v{language} -x -q "{text}"'  # Added -q to suppress audio playback
     process = subprocess.Popen(command, stdout=subprocess.PIPE, shell=True)
     output, _ = process.communicate()
     phonemes = output.decode("utf-8").strip()
     return phonemes
 
-# Function to convert audio file to text using Wav2Vec and then to phonemes using eSpeak
+# Function to convert audio file to text using Wav2Vec2 and then to phonemes using eSpeak
 def audio_to_phonemes(audio_path: str, model, processor) -> str:
-    try:
-        # Load the audio file using librosa
-        waveform, sample_rate = librosa.load(audio_path, sr=16000)
-    except Exception as e:
-        raise RuntimeError(f"Failed to load audio file: {e}")
+    # Load the audio file using librosa
+    waveform, _ = librosa.load(audio_path, sr=16000)
 
-    # Convert the waveform to a tensor
-    waveform = torch.tensor(waveform).unsqueeze(0)  # Add a batch dimension
+    # Convert the waveform to a tensor and preprocess it
+    input_values = processor(waveform, return_tensors="pt", sampling_rate=16000).input_values
 
-    # Preprocess the waveform and run it through the model
-    input_values = processor(waveform.squeeze(), return_tensors="pt", sampling_rate=16000).input_values
-    logits = model(input_values).logits
+    # Run the model to get logits and decode to text
+    with torch.no_grad():  # Disables gradient calculation, speeding up the process
+        logits = model(input_values).logits
     predicted_ids = torch.argmax(logits, dim=-1)
-
-    # Decode the predicted IDs to text
     transcription = processor.batch_decode(predicted_ids)[0]
 
     # Convert the transcribed text to phonemes using eSpeak
@@ -55,7 +50,7 @@ if __name__ == "__main__":
 
     # Example text and audio file
     example_text = "the quick brown fox jumps over the lazy dog"
-    audio_file_path = "WhatsApp Audio 2024-08-12 at 3.38.46 PM (online-audio-converter.com).wav"  # Make sure this path points to a WAV file
+    audio_file_path = "WhatsApp Audio 2024-08-12 at 3.38.46 PM (online-audio-converter.com).wav"  # Ensure this path points to a WAV file
 
     try:
         # Convert text to phonemes
