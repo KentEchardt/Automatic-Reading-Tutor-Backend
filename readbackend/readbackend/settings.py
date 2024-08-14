@@ -12,7 +12,7 @@ https://docs.djangoproject.com/en/5.0/ref/settings/
 from decouple import config
 from pathlib import Path
 import os
-os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'readbackend.readbackend.settings')
+
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -39,10 +39,9 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
-    'readbackend.apps.users',
-    
-   
-
+    'apps.core',
+    'apps.users',
+    'rest_framework',
 ]
 
 MIDDLEWARE = [
