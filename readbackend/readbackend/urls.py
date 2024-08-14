@@ -16,12 +16,14 @@ Including another URLconf
 """
 from django.contrib import admin
 from django.urls import path, include
-from readbackend.apps.users import views
-from . import views
+from apps.users import views
+
+
 
 urlpatterns = [
-    path('admin/', admin.site.urls),
-    path('users/',include('readbackend.urls')),
+    # path('admin/', admin.site.urls),
+    # path('users/',include('readbackend.urls')),
+    path('match-audio/', views.AudioMatchView.as_view(), name='match-audio'),
     #path('signup/', views.user_signup, name='signup'),
     #path('login/', views.user_login, name='login'),
     #path('stories/<int:difficulty_level>/', views.list_stories, name='list_stories'),

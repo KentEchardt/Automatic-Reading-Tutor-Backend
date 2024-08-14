@@ -12,7 +12,7 @@ https://docs.djangoproject.com/en/5.0/ref/settings/
 from decouple import config
 from pathlib import Path
 import os
-os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'readbackend.readbackend.settings')
+
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -22,7 +22,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # See https://docs.djangoproject.com/en/5.0/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = 'django-insecure-#rhbbwk!hu6foj22_mr3(ng0%dyo)b_o6g-9$8)c^7-w_gd2$9'
+SECRET_KEY = 'django-insecure-#rhbbwk!hu6foj22_mr3(ng0yo)b_o6g-9$8)c^7-w_gd2$9'
 
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
@@ -39,10 +39,9 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
-    'readbackend.apps.users',
-    
-   
-
+    'apps.core',
+    'apps.users',
+    'rest_framework',
 ]
 
 MIDDLEWARE = [
