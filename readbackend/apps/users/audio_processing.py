@@ -4,6 +4,10 @@ from transformers import Wav2Vec2ForCTC, Wav2Vec2Processor
 import subprocess
 import io
 
+model_name = "facebook/wav2vec2-large-960h-lv60-self"
+model = Wav2Vec2ForCTC.from_pretrained(model_name)
+processor = Wav2Vec2Processor.from_pretrained(model_name)
+    
 # Function to check if espeak-ng is installed
 def check_espeak():
     return subprocess.run(["espeak-ng", "--version"], capture_output=True, text=True).returncode == 0
@@ -21,9 +25,7 @@ def text_to_phonemes(text: str, language: str = "en") -> str:
 # Function to convert audio file to text using Wav2Vec2 and then to phonemes using eSpeak
 def audio_to_phonemes(audio_file) -> str:
     # Load the audio file from a file-like object using librosa
-    model_name = "facebook/wav2vec2-large-960h-lv60-self"
-    model = Wav2Vec2ForCTC.from_pretrained(model_name)
-    processor = Wav2Vec2Processor.from_pretrained(model_name)
+    
     
     waveform, _ = librosa.load(io.BytesIO(audio_file.read()), sr=16000)
 
