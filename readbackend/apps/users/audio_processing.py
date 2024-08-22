@@ -5,7 +5,7 @@ import subprocess
 import io
 import re
 
-model_name = "facebook/wav2vec2-xlsr-53-espeak-cv-ft"
+model_name = "facebook/wav2vec2-xlsr-53-espeak-cv-ft" #facebook/wav2vec2-lv-60-espeak-cv-ft seems to transcribe more accurately -- Still need to work on alignment either way
 model = Wav2Vec2ForCTC.from_pretrained(model_name)
 processor = Wav2Vec2Processor.from_pretrained(model_name)
 
