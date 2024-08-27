@@ -17,6 +17,16 @@ Including another URLconf
 from django.contrib import admin
 from django.urls import path, include
 from apps.users import views
+from rest_framework.routers import DefaultRouter
+
+
+router = DefaultRouter()
+router.register(r'users', views.UserViewSet)
+router.register(r'stories', views.StoryViewSet)
+router.register(r'reading-sessions', views.ReadingSessionViewSet)
+router.register(r'classes', views.ClassViewSet)
+router.register(r'students', views.StudentViewSet)
+
 
 
 
