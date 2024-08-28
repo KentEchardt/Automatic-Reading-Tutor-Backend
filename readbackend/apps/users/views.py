@@ -68,6 +68,7 @@ class UserViewSet(viewsets.ModelViewSet):
 class StoryViewSet(viewsets.ModelViewSet):
     queryset = Story.objects.all()
     serializer_class = StorySerializer
+    
 
 class ReadingSessionViewSet(viewsets.ModelViewSet):
     queryset = ReadingSession.objects.all()

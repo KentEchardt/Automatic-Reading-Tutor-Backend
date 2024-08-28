@@ -41,4 +41,5 @@ urlpatterns = [
     #path('pronounce/<str:word>/', views.pronounce_word, name='pronounce_word'),
     #path('end-reading/<int:session_id>/', views.end_reading, name='end_reading'),
     #path('performance/<int:reader_id>/', views.check_performance, name='check_performance'),
+    path('', include(router.urls)),
 ]
