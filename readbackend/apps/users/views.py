@@ -9,19 +9,22 @@ from .serializers import UserSerializer, StorySerializer, ReadingSessionSerializ
 from rest_framework.decorators import action
 from rest_framework.response import Response
 
-from .services import match_audio_to_text
+from .audio_processing import compare_phonemes
 
 @method_decorator(csrf_exempt, name='dispatch')
 class AudioMatchView(View):
     def post(self, request):
         session_id = request.POST.get('session_id')
         audio_file = request.FILES.get('audio_file')
+        matching_text = request.POST.get('matching_text')
+        
 
         if not session_id or not audio_file:
             return JsonResponse({'error': 'Invalid input'}, status=400)
 
-        matching_text = "the quick brown fox jumps over the lazy dog" #Need to change function to receive sentence
-        match_result = match_audio_to_text(audio_file, matching_text)
+        # matching_text = "the quick brown fox jumps over the lazy dog" #Need to change function to receive sentence
+        
+        match_result = compare_phonemes(audio_file, matching_text)
 
         return JsonResponse({'match': match_result})
     
