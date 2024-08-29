@@ -57,6 +57,27 @@ def compare_phonemes(audio_file, text: str) -> bool:
     print("Phoneme Comparison Result:", answer)
     return answer
 
+
+def convert_audio_to_wav(audio_file):
+    # Convert M4A to WAV using ffmpeg
+    input_audio = audio_file.read()
+    input_audio = io.BytesIO(input_audio)
+
+    # Temporary file to store converted audio
+    temp_wav_file = 'temp.wav'
+
+    # Convert audio using ffmpeg
+    command = [
+        'ffmpeg', '-i', 'pipe:0', temp_wav_file
+    ]
+    process = subprocess.Popen(command, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    stdout, stderr = process.communicate(input=input_audio.read())
+
+    if process.returncode != 0:
+        raise RuntimeError(f'ffmpeg error: {stderr.decode()}')
+
+    return temp_wav_file
+
 # Example Usage
 # if __name__ == "__main__":
 #     example_text = "the quick brown fox jumps over the lazy dog"

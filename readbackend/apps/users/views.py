@@ -8,8 +8,11 @@ from .models import User, Story, ReadingSession, Class, Student
 from .serializers import UserSerializer, StorySerializer, ReadingSessionSerializer, StudentSerializer, ClassSerializer
 from rest_framework.decorators import action
 from rest_framework.response import Response
+from .audio_processing import compare_phonemes, convert_audio_to_wav
 
-from .audio_processing import compare_phonemes
+
+
+
 
 @method_decorator(csrf_exempt, name='dispatch')
 class AudioMatchView(View):
@@ -19,12 +22,15 @@ class AudioMatchView(View):
         matching_text = request.POST.get('matching_text')
         
 
-        if not session_id or not audio_file:
+        if not session_id or not audio_file or not matching_text:
             return JsonResponse({'error': 'Invalid input'}, status=400)
 
-        # matching_text = "the quick brown fox jumps over the lazy dog" #Need to change function to receive sentence
         
-        match_result = compare_phonemes(audio_file, matching_text)
+         # Convert audio to WAV
+        wav_file_path = convert_audio_to_wav(audio_file)
+        with open(wav_file_path, 'rb') as wav_file:
+            match_result = compare_phonemes(wav_file, matching_text)
+        # match_result = compare_phonemes(wav_audio_file, matching_text)
 
         return JsonResponse({'match': match_result})
     
