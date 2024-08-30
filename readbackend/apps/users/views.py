@@ -12,6 +12,8 @@ from .audio_processing import compare_phonemes,  compare_phonemes_with_sequence_
 from django.shortcuts import get_object_or_404
 from django.http import FileResponse, Http404
 from rest_framework import status
+import base64
+import mimetypes
 
 
 
@@ -73,24 +75,41 @@ class StoryViewSet(viewsets.ModelViewSet):
     queryset = Story.objects.all()
     serializer_class = StorySerializer
     
-    # Return only story IDs
-    @action(detail=False, methods=['get'])
-    def get_all_ids(self, request):
-        story_ids = Story.objects.values_list('id', flat=True)
-        return Response(list(story_ids))
+    # Return only story IDs and difficulty levels - to be categorized on main page
+    @action(detail=False, methods=['get'] )
+    def get_story_listings(self, request):
+        stories = Story.objects.values('id', 'difficulty_level')  # Fetch only 'id' and 'title'
+        return Response(list(stories))
     
     
-    
-    # Return the image data of a story by its ID
+     # Return the image data and title of a story by its ID (for display in Story Card)
     @action(detail=True, methods=['get'])
-    def get_image(self, request, pk=None):
+    def get_story_cover(self, request, pk=None):
         story = get_object_or_404(Story, pk=pk)
         if story.image:
             try:
-                return FileResponse(story.image.open(), content_type='image/jpeg')
+                # Open the image file
+                with story.image.open() as image_file:
+                    # Read image data
+                    image_data = image_file.read()
+                    # Encode image data to base64
+                    encoded_image_data = base64.b64encode(image_data).decode('utf-8')
+                    
+                    # Determine the content type based on the file extension
+                    content_type, _ = mimetypes.guess_type(story.image.name)
+
+                    # Create the response data
+                    response_data = {
+                        'title': story.title,
+                        'image_data': encoded_image_data,
+                        'content_type': content_type or 'application/octet-stream'  # Default content type if not found
+                    }
+
+                    return JsonResponse(response_data)
+
             except FileNotFoundError:
-                raise Http404("Image not found")
-        return Response({'error': 'No image available for this story'}, status=404)
+                return Response({'error': 'Image not found'}, status=status.HTTP_404_NOT_FOUND)
+        return Response({'error': 'No image available for this story'}, status=status.HTTP_404_NOT_FOUND)
     
 
 class ReadingSessionViewSet(viewsets.ModelViewSet):
