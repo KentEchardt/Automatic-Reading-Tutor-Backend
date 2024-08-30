@@ -4,6 +4,8 @@ from transformers import Wav2Vec2ForCTC, Wav2Vec2Processor
 import subprocess
 import io
 import re
+from difflib import SequenceMatcher
+import Levenshtein
 
 model_name = "facebook/wav2vec2-xlsr-53-espeak-cv-ft" #facebook/wav2vec2-lv-60-espeak-cv-ft seems to transcribe more accurately -- Still need to work on alignment either way
 model = Wav2Vec2ForCTC.from_pretrained(model_name)
@@ -14,7 +16,7 @@ def check_espeak():
     return subprocess.run(["espeak-ng", "--version"], capture_output=True, text=True).returncode == 0
 
 # Function to convert text to phonemes using eSpeak
-def text_to_phonemes(text: str, language: str = "en-za") -> str:
+def text_to_phonemes(text: str, language: str = "en-us") -> str: #Found that US english was best 
     command = f'espeak-ng -v{language} --ipa=1 -q "{text}"'  # Added -q to suppress audio playback
     process = subprocess.Popen(command, stdout=subprocess.PIPE, shell=True)
     output, _ = process.communicate()
@@ -24,7 +26,8 @@ def text_to_phonemes(text: str, language: str = "en-za") -> str:
 
 # Function to convert audio file to text using Wav2Vec2 and then to phonemes using eSpeak
 def audio_to_phonemes(audio_file) -> str:
-    waveform, _ = librosa.load(io.BytesIO(audio_file.read()), sr=16000)
+    wav_file = convert_audio_to_wav(audio_file)
+    waveform, _ = librosa.load(io.BytesIO(wav_file.read()), sr=16000)
     input_values = processor(waveform, return_tensors="pt", sampling_rate=16000).input_values
     with torch.no_grad():
         logits = model(input_values).logits
@@ -58,17 +61,14 @@ def compare_phonemes(audio_file, text: str) -> bool:
     return answer
 
 
+# Function to convert audio_file from webm (as received) to Wav (as needed by Librosa)
 def convert_audio_to_wav(audio_file):
-    # Convert M4A to WAV using ffmpeg
-    input_audio = audio_file.read()
-    input_audio = io.BytesIO(input_audio)
-
-    # Temporary file to store converted audio
-    temp_wav_file = 'temp.wav'
+    input_audio = io.BytesIO(audio_file.read())
+    output_audio = io.BytesIO()
 
     # Convert audio using ffmpeg
     command = [
-        'ffmpeg', '-i', 'pipe:0', temp_wav_file
+        'ffmpeg', '-i', 'pipe:0', '-f', 'wav', 'pipe:1'
     ]
     process = subprocess.Popen(command, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     stdout, stderr = process.communicate(input=input_audio.read())
@@ -76,20 +76,38 @@ def convert_audio_to_wav(audio_file):
     if process.returncode != 0:
         raise RuntimeError(f'ffmpeg error: {stderr.decode()}')
 
-    return temp_wav_file
+    output_audio.write(stdout)
+    output_audio.seek(0)  # Reset buffer position to the beginning
+    return output_audio
 
-# Example Usage
-# if __name__ == "__main__":
-#     example_text = "the quick brown fox jumps over the lazy dog"
-#     audio_file_path = "path/to/your/audio/file.wav"  # Ensure this path points to a WAV file
+# Function to compare phonemes with a tolerance using SequenceMatcher
+def compare_phonemes_with_sequence_matcher(audio_file, text: str, threshold=0.75) -> bool:  # 0.75 is a little generous, but might be necessary
+    audio_transcription = audio_to_phonemes(audio_file)
+    text_phonemes = text_to_phonemes(text)
+    normalized_audio_phonemes = normalize_phonemes(audio_transcription)
+    normalized_text_phonemes = normalize_phonemes(text_phonemes)
+    print("Normalized Audio Phonemes:", normalized_audio_phonemes)
+    print("Normalized Text Phonemes:", normalized_text_phonemes)
+    matcher = SequenceMatcher(None, normalized_audio_phonemes, normalized_text_phonemes)
+    similarity = matcher.ratio()
+    print(f"SequenceMatcher Similarity: {similarity}")
+    return similarity >= threshold
 
-#     try:
-#         with open(audio_file_path, 'rb') as audio_file:
-#             # Compare phonemes
-#             match = compare_phonemes(audio_file, example_text)
-#             if match:
-#                 print("The phoneme strings match.")
-#             else:
-#                 print("The phoneme strings do not match.")
-#     except RuntimeError as e:
-#         print(f"Error: {e}")
+# Function to compare phonemes with a tolerance using Levenshtein distance
+def compare_phonemes_with_levenshtein(audio_file, text: str, tolerance=0.2) -> bool:
+    audio_transcription = audio_to_phonemes(audio_file)
+    text_phonemes = text_to_phonemes(text)
+    normalized_audio_phonemes = normalize_phonemes(audio_transcription)
+    normalized_text_phonemes = normalize_phonemes(text_phonemes)
+    print("Normalized Audio Phonemes:", normalized_audio_phonemes)
+    print("Normalized Text Phonemes:", normalized_text_phonemes)
+    
+    # Calculate Levenshtein Distance
+    distance = Levenshtein.distance(normalized_audio_phonemes, normalized_text_phonemes)
+    max_len = max(len(normalized_audio_phonemes), len(normalized_text_phonemes))
+    
+    # Determine if distance is within tolerance
+    similarity = 1 - (distance / max_len)
+    print(f"Levenshtein Distance: {distance}")
+    print(f"Similarity: {similarity}")
+    return similarity >= (1 - tolerance)

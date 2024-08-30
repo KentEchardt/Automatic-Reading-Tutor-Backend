@@ -8,8 +8,9 @@ from .models import User, Story, ReadingSession, Class, Student
 from .serializers import UserSerializer, StorySerializer, ReadingSessionSerializer, StudentSerializer, ClassSerializer
 from rest_framework.decorators import action
 from rest_framework.response import Response
-from .audio_processing import compare_phonemes, convert_audio_to_wav
-
+from .audio_processing import compare_phonemes, convert_audio_to_wav, compare_phonemes_with_sequence_matcher, compare_phonemes_with_levenshtein
+from django.shortcuts import get_object_or_404
+from django.http import FileResponse, Http404
 
 
 
@@ -20,18 +21,14 @@ class AudioMatchView(View):
         session_id = request.POST.get('session_id')
         audio_file = request.FILES.get('audio_file')
         matching_text = request.POST.get('matching_text')
-        
 
         if not session_id or not audio_file or not matching_text:
             return JsonResponse({'error': 'Invalid input'}, status=400)
-
         
-         # Convert audio to WAV
-        wav_file_path = convert_audio_to_wav(audio_file)
-        with open(wav_file_path, 'rb') as wav_file:
-            match_result = compare_phonemes(wav_file, matching_text)
-        # match_result = compare_phonemes(wav_audio_file, matching_text)
-
+        # match_result = compare_phonemes(audio_file, matching_text)
+        match_result = compare_phonemes_with_sequence_matcher(audio_file, matching_text) # Decided on sequenceMatcher implementation for now 
+        # match_result = compare_phonemes_with_levenshtein(audio_file, matching_text)
+        
         return JsonResponse({'match': match_result})
     
 class UserViewSet(viewsets.ModelViewSet):
@@ -74,6 +71,25 @@ class UserViewSet(viewsets.ModelViewSet):
 class StoryViewSet(viewsets.ModelViewSet):
     queryset = Story.objects.all()
     serializer_class = StorySerializer
+    
+    # Return only story IDs
+    @action(detail=False, methods=['get'])
+    def get_all_ids(self, request):
+        story_ids = Story.objects.values_list('id', flat=True)
+        return Response(list(story_ids))
+    
+    
+    
+    # Return the image data of a story by its ID
+    @action(detail=True, methods=['get'])
+    def get_image(self, request, pk=None):
+        story = get_object_or_404(Story, pk=pk)
+        if story.image:
+            try:
+                return FileResponse(story.image.open(), content_type='image/jpeg')
+            except FileNotFoundError:
+                raise Http404("Image not found")
+        return Response({'error': 'No image available for this story'}, status=404)
     
 
 class ReadingSessionViewSet(viewsets.ModelViewSet):
