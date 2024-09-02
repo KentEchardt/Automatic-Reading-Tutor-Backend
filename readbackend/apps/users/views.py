@@ -70,6 +70,11 @@ class UserViewSet(viewsets.ModelViewSet):
         user = self.queryset.filter(username=username).first()
         serializer = self.get_serializer(user)
         return Response(serializer.data)
+    
+    @action(detail=False, url_path=r'check-username/(?P<username>\w+)')
+    def check_username_exists(self, request, username=None):
+        user_exists = self.queryset.filter(username=username).exists()
+        return Response({"exists": user_exists}, status=status.HTTP_200_OK)
 
 class StoryViewSet(viewsets.ModelViewSet):
     queryset = Story.objects.all()
