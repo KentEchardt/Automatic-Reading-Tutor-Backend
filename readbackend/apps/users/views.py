@@ -14,6 +14,9 @@ from django.http import FileResponse, Http404
 from rest_framework import status
 import base64
 import mimetypes
+from django.utils import timezone
+
+from datetime import timedelta
 
 
 
@@ -27,11 +30,25 @@ class AudioMatchView(View):
 
         if not session_id or not audio_file or not matching_text:
             return JsonResponse({'error': 'Invalid input'}, status=400)
-        
-        # match_result = compare_phonemes(audio_file, matching_text)
-        match_result = compare_phonemes_with_sequence_matcher(audio_file, matching_text) # Decided on sequenceMatcher implementation for now 
-        # match_result = compare_phonemes_with_levenshtein(audio_file, matching_text)
-        
+
+        try:
+            session = ReadingSession.objects.get(id=session_id)
+        except ReadingSession.DoesNotExist:
+            return JsonResponse({'error': 'Session not found'}, status=404)
+
+        # Perform the phoneme matching
+        match_result = compare_phonemes_with_sequence_matcher(audio_file, matching_text)
+
+        if not match_result:
+            # Increment the error count if the match fails
+            session.total_errors += 1
+            session.save()
+        else:
+            # Logic for updating story progress could go here
+            # For now, we simply increment the progress by some placeholder logic
+            session.story_progress += 10.0  # Example increment (this would depend on your logic)
+            session.save()
+
         return JsonResponse({'match': match_result})
     
 class UserViewSet(viewsets.ModelViewSet):
@@ -126,6 +143,53 @@ class ReadingSessionViewSet(viewsets.ModelViewSet):
         session = self.queryset.filter(user__id=user_id, story__id=story_id).first()
         serializer = self.get_serializer(session)
         return Response(serializer.data)
+
+    @action(detail=False, methods=['post'], url_path='create-session')
+    def create_session(self, request):
+        user_id = request.data.get('user_id')
+        story_id = request.data.get('story_id')
+
+        if not user_id or not story_id:
+            return Response({'error': 'User ID and Story ID are required.'}, status=400)
+
+        session = ReadingSession.objects.create(user_id=user_id, story_id=story_id, start_datetime=timezone.now())
+        return Response({'session_id': session.id}, status=201)
+
+    @action(detail=False, methods=['post'], url_path='start-session')
+    def start_session(self, request):
+        user_id = request.data.get('user_id')
+        story_id = request.data.get('story_id')
+
+        if not user_id or not story_id:
+            return Response({'error': 'User ID and Story ID are required.'}, status=400)
+
+        session = ReadingSession.objects.filter(user_id=user_id, story_id=story_id).order_by('-end_datetime').first()
+
+        if session and not session.end_datetime:
+            # Resume an existing session that hasn't been ended yet
+            return Response({'session_id': session.id}, status=200)
+
+        # Otherwise, create a new session
+        new_session = ReadingSession.objects.create(user_id=user_id, story_id=story_id, start_datetime=timezone.now())
+        return Response({'session_id': new_session.id}, status=201)
+
+    @action(detail=False, methods=['post'], url_path='end-session')
+    def end_session(self, request):
+        session_id = request.data.get('session_id')
+        time_reading = request.data.get('time_reading')
+
+        try:
+            session = ReadingSession.objects.get(id=session_id)
+        except ReadingSession.DoesNotExist:
+            return Response({'error': 'Session not found.'}, status=404)
+
+        session.end_datetime = timezone.now()
+        
+        # Add the time_reading (received from frontend) to total_reading_time
+        session.total_reading_time += timedelta(seconds=int(time_reading))
+        session.save()
+
+        return Response({'message': 'Session ended and time updated successfully.'}, status=200)
     
 
 class ClassViewSet(viewsets.ModelViewSet):

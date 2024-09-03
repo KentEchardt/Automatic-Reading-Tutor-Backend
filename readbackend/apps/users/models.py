@@ -1,5 +1,7 @@
 from django.contrib.auth.models import AbstractUser, Group
 from django.db import models
+from django.utils import timezone
+from datetime import timedelta
 
 # User model, broken down into admin, teacher and reader roles
 class User(AbstractUser):
@@ -40,13 +42,14 @@ class Story(models.Model):
     def __str__(self):
         return self.title
 
-# ReadingSession model
 class ReadingSession(models.Model):
     user = models.ForeignKey(User, on_delete=models.CASCADE)
     story = models.ForeignKey(Story, on_delete=models.CASCADE)
-    start_datetime = models.DateTimeField()
+    start_datetime = models.DateTimeField(default=timezone.now)
     end_datetime = models.DateTimeField(null=True, blank=True)
     story_progress = models.FloatField()  # e.g., percentage of story completed
+    total_errors = models.IntegerField(default=0)  # Track the total number of errors
+    total_reading_time = models.DurationField(default=timedelta(0))  # Track the total reading time
 
     def __str__(self):
         return f'{self.user.username} - {self.story.title}'
