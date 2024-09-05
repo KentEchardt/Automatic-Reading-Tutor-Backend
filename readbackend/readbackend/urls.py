@@ -27,6 +27,10 @@ router.register(r'reading-sessions', views.ReadingSessionViewSet)
 router.register(r'classes', views.ClassViewSet)
 router.register(r'students', views.StudentViewSet)
 
+from rest_framework_simplejwt.views import (
+    TokenObtainPairView,
+    TokenRefreshView,
+)
 
 
 
@@ -42,4 +46,6 @@ urlpatterns = [
     #path('end-reading/<int:session_id>/', views.end_reading, name='end_reading'),
     #path('performance/<int:reader_id>/', views.check_performance, name='check_performance'),
     path('', include(router.urls)),
+    path('api/token/', TokenObtainPairView.as_view(), name='token_obtain_pair'),
+    path('api/token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
 ]

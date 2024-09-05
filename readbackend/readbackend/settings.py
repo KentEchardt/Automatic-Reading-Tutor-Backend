@@ -12,7 +12,7 @@ https://docs.djangoproject.com/en/5.0/ref/settings/
 from decouple import config
 from pathlib import Path
 import os
-
+from datetime import timedelta
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -58,11 +58,29 @@ MIDDLEWARE = [
 
 # Allow all origins (development only)
 CORS_ALLOW_ALL_ORIGINS = True
-# If you want to restrict to specific origins:
+# Restrict to specific origins:
 # CORS_ALLOWED_ORIGINS = [
 #     'http://localhost:3001',
 #     'http://127.0.0.1:3001',
 # ]
+
+# Using JWT for authentication using tokens
+REST_FRAMEWORK = {
+    'DEFAULT_AUTHENTICATION_CLASSES': [
+        'rest_framework_simplejwt.authentication.JWTAuthentication',
+    ],
+    'DEFAULT_PERMISSION_CLASSES': [
+        'rest_framework.permissions.IsAuthenticated',  # Requires authentication by default
+    ],
+}
+# JWT settings (long lifetimes for development)
+SIMPLE_JWT = {
+    'ACCESS_TOKEN_LIFETIME': timedelta(days=7),
+    'REFRESH_TOKEN_LIFETIME': timedelta(days=30),
+    'ROTATE_REFRESH_TOKENS': True,
+    'BLACKLIST_AFTER_ROTATION': True,
+    'AUTH_HEADER_TYPES': ('Bearer',),
+}
 
 ROOT_URLCONF = 'readbackend.urls'
 

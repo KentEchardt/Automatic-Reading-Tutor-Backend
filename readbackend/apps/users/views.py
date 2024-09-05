@@ -17,16 +17,21 @@ import mimetypes
 from django.utils import timezone
 
 from datetime import timedelta
+from .permissions import IsAdmin, IsTeacher, IsReader
+from rest_framework.permissions import AllowAny, IsAuthenticated
 
 
 
 
 @method_decorator(csrf_exempt, name='dispatch')
 class AudioMatchView(View):
+    # permission_classes = [IsReader] e.g. of setting permission class
+    
     def post(self, request):
         session_id = request.POST.get('session_id')
         audio_file = request.FILES.get('audio_file')
         matching_text = request.POST.get('matching_text')
+        
 
         if not session_id or not audio_file or not matching_text:
             return JsonResponse({'error': 'Invalid input'}, status=400)
@@ -55,14 +60,22 @@ class UserViewSet(viewsets.ModelViewSet):
     queryset = User.objects.all()
     serializer_class = UserSerializer
     
+    def get_permissions(self):
+        # Allow anyone to create a new user (i.e., registration)
+        if self.action == 'create':
+            return [AllowAny()]
+        # All other actions require authentication
+        return [IsAuthenticated()]
+    
     def create(self, request, *args, **kwargs):
         role = request.data.get('role')
-        reading_level = request.data.get('reading_level')
-
-        if role == 'reader' and not reading_level:
-            return Response({"error": "Reading level is required for readers."}, status=status.HTTP_400_BAD_REQUEST)
-
+        
+        # If the user role is 'reader', set the reading level to 0
+        if role == 'reader':
+            request.data['reading_level'] = 0
+        
         return super().create(request, *args, **kwargs)
+
 
     @action(detail=False)
     def admins(self, request):
