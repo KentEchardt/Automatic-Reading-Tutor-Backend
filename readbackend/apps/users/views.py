@@ -10,7 +10,6 @@ from rest_framework.decorators import action
 from rest_framework.response import Response
 from .audio_processing import compare_phonemes,  compare_phonemes_with_sequence_matcher, compare_phonemes_with_levenshtein
 from django.shortcuts import get_object_or_404
-from django.http import FileResponse, Http404
 from rest_framework import status
 import base64
 import mimetypes
@@ -19,9 +18,15 @@ from django.utils import timezone
 from datetime import timedelta
 from .permissions import IsAdmin, IsTeacher, IsReader
 from rest_framework.permissions import AllowAny, IsAuthenticated
+from django.contrib.auth.hashers import make_password
 
 
+from rest_framework_simplejwt.views import TokenObtainPairView
+from .serializers import CustomTokenObtainPairSerializer
 
+
+class CustomTokenObtainPairView(TokenObtainPairView):
+    serializer_class = CustomTokenObtainPairSerializer
 
 @method_decorator(csrf_exempt, name='dispatch')
 class AudioMatchView(View):
@@ -61,20 +66,49 @@ class UserViewSet(viewsets.ModelViewSet):
     serializer_class = UserSerializer
     
     def get_permissions(self):
-        # Allow anyone to create a new user (i.e., registration)
-        if self.action == 'create':
-            return [AllowAny()]
-        # All other actions require authentication
-        return [IsAuthenticated()]
+        if self.action == 'create' or self.action=='check_username_exists':
+            return [AllowAny()]  # Allow user creation without authentication
+        return [IsAuthenticated()]  # Require authentication for all other actions
+    
+    @action(detail=False, methods=['get'])
+    def role(self, request):
+        """
+        Endpoint to return the role of the logged-in user.
+        """
+        user = request.user
+        return Response({'role': user.role})
+    
+    @action(detail=False, methods=['get'])
+    def username(self, request):
+        """
+        Endpoint to return the username of the logged-in user based on the token.
+        """
+        user = request.user
+        return Response({'username': user.username})
+    
+    @action(detail=False, methods=['get'])
+    def readinglevel(self, request):
+        """
+        Endpoint to return the reading level of the logged-in user based on the token.
+        """
+        user = request.user
+        return Response({'reading_level': user.reading_level})
+    
     
     def create(self, request, *args, **kwargs):
         role = request.data.get('role')
-        
-        # If the user role is 'reader', set the reading level to 0
+
+        # Set the reading level to 0 if the role is 'reader'
         if role == 'reader':
             request.data['reading_level'] = 0
-        
-        return super().create(request, *args, **kwargs)
+
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)  # Validate request data
+
+        # Call the superclass method to save the user
+        self.perform_create(serializer)
+        return Response(serializer.data, status=status.HTTP_201_CREATED)
+
 
 
     @action(detail=False)
@@ -103,8 +137,9 @@ class UserViewSet(viewsets.ModelViewSet):
     
     @action(detail=False, url_path=r'check-username/(?P<username>\w+)')
     def check_username_exists(self, request, username=None):
-        user_exists = self.queryset.filter(username=username).exists()
+        user_exists = self.queryset.filter(username__iexact=username).exists()
         return Response({"exists": user_exists}, status=status.HTTP_200_OK)
+
 
 class StoryViewSet(viewsets.ModelViewSet):
     queryset = Story.objects.all()
@@ -204,6 +239,36 @@ class ReadingSessionViewSet(viewsets.ModelViewSet):
 
         return Response({'message': 'Session ended and time updated successfully.'}, status=200)
     
+    @action(detail=False, methods=['get'], url_path='total-stories-read')
+    def total_stories_read(self, request):
+        """
+        Endpoint to return the total number of unique stories read by the authenticated user.
+        """
+        user = request.user
+
+        # Count the number of unique stories the user has read
+        unique_stories_count = ReadingSession.objects.filter(user=user).values('story').distinct().count()
+
+        return Response({'total_stories_read': unique_stories_count}, status=status.HTTP_200_OK)
+
+
+    @action(detail=False, methods=['get'], url_path='most-recent-story')
+    def most_recent_story(self, request):
+        """
+        Endpoint to return the most recent story read by the authenticated user.
+        """
+        user = request.user
+
+        # Get the most recent reading session for the user
+        latest_session = ReadingSession.objects.filter(user=user).order_by('-start_datetime').first()
+
+        if latest_session:
+            # Retrieve the story associated with the latest session
+            story = get_object_or_404(Story, id=latest_session.story.id)
+            serializer = StorySerializer(story)  # Assuming you have a StorySerializer
+            return Response(serializer.data, status=status.HTTP_200_OK)
+        else:
+            return Response({'error': 'No reading sessions found for this user.'}, status=status.HTTP_404_NOT_FOUND)    
 
 class ClassViewSet(viewsets.ModelViewSet):
     queryset = Class.objects.all()

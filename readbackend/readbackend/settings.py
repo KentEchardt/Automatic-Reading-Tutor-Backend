@@ -59,10 +59,12 @@ MIDDLEWARE = [
 # Allow all origins (development only)
 CORS_ALLOW_ALL_ORIGINS = True
 # Restrict to specific origins:
-# CORS_ALLOWED_ORIGINS = [
-#     'http://localhost:3001',
-#     'http://127.0.0.1:3001',
-# ]
+CORS_ALLOWED_ORIGINS = [
+    'http://localhost:3001',
+    'http://127.0.0.1:3001',
+]
+
+AUTH_USER_MODEL = 'users.User'
 
 # Using JWT for authentication using tokens
 REST_FRAMEWORK = {
@@ -77,8 +79,9 @@ REST_FRAMEWORK = {
 SIMPLE_JWT = {
     'ACCESS_TOKEN_LIFETIME': timedelta(days=7),
     'REFRESH_TOKEN_LIFETIME': timedelta(days=30),
-    'ROTATE_REFRESH_TOKENS': True,
+    'ROTATE_REFRESH_TOKENS': False,
     'BLACKLIST_AFTER_ROTATION': True,
+    'UPDATE_LAST_LOGIN': False,
     'AUTH_HEADER_TYPES': ('Bearer',),
 }
 

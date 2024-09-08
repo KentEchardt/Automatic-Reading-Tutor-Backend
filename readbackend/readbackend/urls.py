@@ -18,34 +18,25 @@ from django.contrib import admin
 from django.urls import path, include
 from apps.users import views
 from rest_framework.routers import DefaultRouter
+from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
+
 
 
 router = DefaultRouter()
 router.register(r'users', views.UserViewSet)
 router.register(r'stories', views.StoryViewSet)
-router.register(r'reading-sessions', views.ReadingSessionViewSet)
+router.register(r'readingsessions', views.ReadingSessionViewSet)
 router.register(r'classes', views.ClassViewSet)
 router.register(r'students', views.StudentViewSet)
 
-from rest_framework_simplejwt.views import (
-    TokenObtainPairView,
-    TokenRefreshView,
-)
+
 
 
 
 urlpatterns = [
-    # path('admin/', admin.site.urls),
-    # path('users/',include('readbackend.urls')),
     path('match-audio/', views.AudioMatchView.as_view(), name='match-audio'),
-    #path('signup/', views.user_signup, name='signup'),
-    #path('login/', views.user_login, name='login'),
-    #path('stories/<int:difficulty_level>/', views.list_stories, name='list_stories'),
-    #path('start-reading/<int:story_id>/', views.start_reading, name='start_reading'),
-    #path('pronounce/<str:word>/', views.pronounce_word, name='pronounce_word'),
-    #path('end-reading/<int:session_id>/', views.end_reading, name='end_reading'),
-    #path('performance/<int:reader_id>/', views.check_performance, name='check_performance'),
-    path('', include(router.urls)),
-    path('api/token/', TokenObtainPairView.as_view(), name='token_obtain_pair'),
+    path('api/token/', views.CustomTokenObtainPairView.as_view(), name='token_obtain_pair'),
     path('api/token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
+    path('', include(router.urls)),
+    
 ]

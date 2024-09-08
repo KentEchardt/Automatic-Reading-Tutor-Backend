@@ -1,10 +1,35 @@
 from rest_framework import serializers
 from .models import User, Story, ReadingSession, Class, Student
+from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 
+class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
+    @classmethod
+    def get_token(cls, user):
+        token = super().get_token(user)
+        # Add custom claims
+        token['role'] = user.role
+        token['reading_level'] = user.reading_level
+        return token
+    
 class UserSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
-        fields = ['id', 'username', 'first_name', 'last_name', 'email', 'role', 'reading_level']
+        fields = ['id', 'username', 'password', 'email', 'role', 'reading_level']
+        extra_kwargs = {
+            'reading_level': {'required': False, 'write_only': True},  # Optional and not required in the payload
+            'password': {'write_only': True}  # Ensure password is write-only
+        }
+    
+    def create(self, validated_data):
+        # Extract password from validated_data
+        password = validated_data.pop('password', None)
+        # Create user instance
+        user = super().create(validated_data)
+        if password:
+            # Hash the password and save the user
+            user.set_password(password)
+            user.save()
+        return user
 
 class StorySerializer(serializers.ModelSerializer):
     class Meta:
