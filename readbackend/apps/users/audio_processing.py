@@ -11,9 +11,6 @@ model_name = "facebook/wav2vec2-xlsr-53-espeak-cv-ft" #facebook/wav2vec2-lv-60-e
 model = Wav2Vec2ForCTC.from_pretrained(model_name)
 processor = Wav2Vec2Processor.from_pretrained(model_name)
 
-# Function to check if espeak-ng is installed
-def check_espeak():
-    return subprocess.run(["espeak-ng", "--version"], capture_output=True, text=True).returncode == 0
 
 # Function to convert text to phonemes using eSpeak
 def text_to_phonemes(text: str, language: str = "en-us") -> str: #Found that US english was best 

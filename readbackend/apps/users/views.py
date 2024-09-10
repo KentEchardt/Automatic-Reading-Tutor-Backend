@@ -77,6 +77,8 @@ class PronunciationView(View):
         return JsonResponse({'correct_pronunciation':correct_pronunciation})
 
 # Viewsets - views & endpoints for all models 
+
+# Viewset for Users
 class UserViewSet(viewsets.ModelViewSet):
     queryset = User.objects.all()
     serializer_class = UserSerializer
@@ -156,7 +158,7 @@ class UserViewSet(viewsets.ModelViewSet):
         user_exists = self.queryset.filter(username__iexact=username).exists()
         return Response({"exists": user_exists}, status=status.HTTP_200_OK)
 
-
+# Viewset for Stories
 class StoryViewSet(viewsets.ModelViewSet):
     queryset = Story.objects.all()
     serializer_class = StorySerializer
@@ -164,7 +166,7 @@ class StoryViewSet(viewsets.ModelViewSet):
     # Return only story IDs and difficulty levels - to be categorized on main page
     @action(detail=False, methods=['get'] )
     def get_story_listings(self, request):
-        stories = Story.objects.values('id', 'difficulty_level')  # Fetch only 'id' and 'title'
+        stories = Story.objects.values('id', 'difficulty_level')  # Fetch only 'id' and 'difficulty level' 
         return Response(list(stories))
     
     
@@ -197,46 +199,45 @@ class StoryViewSet(viewsets.ModelViewSet):
                 return Response({'error': 'Image not found'}, status=status.HTTP_404_NOT_FOUND)
         return Response({'error': 'No image available for this story'}, status=status.HTTP_404_NOT_FOUND)
     
-
+# Viewset for ReadingSessions
 class ReadingSessionViewSet(viewsets.ModelViewSet):
     queryset = ReadingSession.objects.all()
     serializer_class = ReadingSessionSerializer
-
-    @action(detail=True, url_path=r'by-user/(?P<user_id>\d+)/story/(?P<story_id>\d+)')
-    def get_user_story(self, request, user_id=None, story_id=None):
-        session = self.queryset.filter(user__id=user_id, story__id=story_id).first()
-        serializer = self.get_serializer(session)
-        return Response(serializer.data)
-
-    @action(detail=False, methods=['post'], url_path='create-session')
-    def create_session(self, request):
-        user_id = request.data.get('user_id')
-        story_id = request.data.get('story_id')
-
-        if not user_id or not story_id:
-            return Response({'error': 'User ID and Story ID are required.'}, status=400)
-
-        session = ReadingSession.objects.create(user_id=user_id, story_id=story_id, start_datetime=timezone.now())
-        return Response({'session_id': session.id}, status=201)
-
+   
+    # View to start a reading session
     @action(detail=False, methods=['post'], url_path='start-session')
     def start_session(self, request):
-        user_id = request.data.get('user_id')
+        user = request.user
         story_id = request.data.get('story_id')
 
-        if not user_id or not story_id:
-            return Response({'error': 'User ID and Story ID are required.'}, status=400)
+        if not story_id:
+            return Response({'error': 'Story ID is required.'}, status=status.HTTP_400_BAD_REQUEST)
 
-        session = ReadingSession.objects.filter(user_id=user_id, story_id=story_id).order_by('-end_datetime').first()
+        story = Story.objects.filter(id=story_id).first()
+        
+        if not story:
+            return Response({'error': 'Story not found.'}, status=status.HTTP_404_NOT_FOUND)
+
+        session = ReadingSession.objects.filter(user=user, story=story).order_by('-end_datetime').first()
 
         if session and not session.end_datetime:
             # Resume an existing session that hasn't been ended yet
-            return Response({'session_id': session.id}, status=200)
+            return Response({'session_id': session.id}, status=status.HTTP_200_OK)
 
         # Otherwise, create a new session
-        new_session = ReadingSession.objects.create(user_id=user_id, story_id=story_id, start_datetime=timezone.now())
-        return Response({'session_id': new_session.id}, status=201)
+        new_session = ReadingSession.objects.create(
+            user=user,
+            story=story,
+            start_datetime=timezone.now(),
+            story_progress=0.0,  # Initialize progress
+            total_errors=0,       # Initialize errors
+            total_reading_time=timedelta(0)  # Initialize reading time
+        )
 
+        return Response({'session_id': new_session.id}, status=status.HTTP_201_CREATED)
+    
+    
+    # View to end a reading session
     @action(detail=False, methods=['post'], url_path='end-session')
     def end_session(self, request):
         session_id = request.data.get('session_id')
