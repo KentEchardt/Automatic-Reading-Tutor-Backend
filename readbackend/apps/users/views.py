@@ -23,11 +23,13 @@ from django.contrib.auth.hashers import make_password
 
 from rest_framework_simplejwt.views import TokenObtainPairView
 from .serializers import CustomTokenObtainPairSerializer
+from .pronounce import get_phonetic_spelling
 
 
 class CustomTokenObtainPairView(TokenObtainPairView):
     serializer_class = CustomTokenObtainPairSerializer
 
+# View / endpoint for matching received audio to text
 @method_decorator(csrf_exempt, name='dispatch')
 class AudioMatchView(View):
     # permission_classes = [IsReader] e.g. of setting permission class
@@ -37,7 +39,6 @@ class AudioMatchView(View):
         audio_file = request.FILES.get('audio_file')
         matching_text = request.POST.get('matching_text')
         
-
         if not session_id or not audio_file or not matching_text:
             return JsonResponse({'error': 'Invalid input'}, status=400)
 
@@ -61,6 +62,21 @@ class AudioMatchView(View):
 
         return JsonResponse({'match': match_result})
     
+# View / endpoint for getting pronunciation of a specified word / sentence
+@method_decorator(csrf_exempt, name='dispatch')
+class PronunciationView(View):
+    
+    def post(self,request):
+        mispronounced_text = request.POST.get('mispronounced_text')
+        
+        if not(mispronounced_text) or mispronounced_text=="":
+            return JsonResponse({'error': 'Invalid input'}, status=400)
+        
+        correct_pronunciation = get_phonetic_spelling(mispronounced_text)
+        
+        return JsonResponse({'correct_pronunciation':correct_pronunciation})
+
+# Viewsets - views & endpoints for all models 
 class UserViewSet(viewsets.ModelViewSet):
     queryset = User.objects.all()
     serializer_class = UserSerializer

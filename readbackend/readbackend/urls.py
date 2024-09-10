@@ -35,6 +35,7 @@ router.register(r'students', views.StudentViewSet)
 
 urlpatterns = [
     path('match-audio/', views.AudioMatchView.as_view(), name='match-audio'),
+    path('match-audio/', views.PronunciationView.as_view(), name='get-pronunciation'),
     path('api/token/', views.CustomTokenObtainPairView.as_view(), name='token_obtain_pair'),
     path('api/token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
     path('', include(router.urls)),
