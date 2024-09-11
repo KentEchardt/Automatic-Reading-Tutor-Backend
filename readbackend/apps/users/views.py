@@ -116,9 +116,8 @@ class UserViewSet(viewsets.ModelViewSet):
     def create(self, request, *args, **kwargs):
         role = request.data.get('role')
 
-        # Set the reading level to 0 if the role is 'reader'
-        if role == 'reader':
-            request.data['reading_level'] = 0
+        # Set the reading level to 0 
+        request.data['reading_level'] = 0
 
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)  # Validate request data
@@ -199,6 +198,8 @@ class StoryViewSet(viewsets.ModelViewSet):
                 return Response({'error': 'Image not found'}, status=status.HTTP_404_NOT_FOUND)
         return Response({'error': 'No image available for this story'}, status=status.HTTP_404_NOT_FOUND)
     
+
+        
 # Viewset for ReadingSessions
 class ReadingSessionViewSet(viewsets.ModelViewSet):
     queryset = ReadingSession.objects.all()
@@ -256,6 +257,24 @@ class ReadingSessionViewSet(viewsets.ModelViewSet):
 
         return Response({'message': 'Session ended and time updated successfully.'}, status=200)
     
+    # View to pause a reading session
+    @action(detail=False, methods=['post'], url_path='pause-session')
+    def pause_session(self, request):
+        session_id = request.data.get('session_id')
+        time_reading = request.data.get('time_reading')
+
+        try:
+            session = ReadingSession.objects.get(id=session_id)
+        except ReadingSession.DoesNotExist:
+            return Response({'error': 'Session not found.'}, status=404)
+        
+        # Add the time_reading (received from frontend) to total_reading_time
+        session.total_reading_time += timedelta(seconds=int(time_reading))
+        session.save()
+
+        return Response({'message': 'Session paused and time updated successfully.'}, status=200)
+    
+    
     @action(detail=False, methods=['get'], url_path='total-stories-read')
     def total_stories_read(self, request):
         """
@@ -282,8 +301,7 @@ class ReadingSessionViewSet(viewsets.ModelViewSet):
         if latest_session:
             # Retrieve the story associated with the latest session
             story = get_object_or_404(Story, id=latest_session.story.id)
-            serializer = StorySerializer(story)  # Assuming you have a StorySerializer
-            return Response(serializer.data, status=status.HTTP_200_OK)
+            return Response({'story_id':story.id}, status=status.HTTP_200_OK)
         else:
             return Response({'error': 'No reading sessions found for this user.'}, status=status.HTTP_404_NOT_FOUND)    
 
