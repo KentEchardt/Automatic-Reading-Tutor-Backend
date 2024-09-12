@@ -162,6 +162,30 @@ class StoryViewSet(viewsets.ModelViewSet):
     queryset = Story.objects.all()
     serializer_class = StorySerializer
     
+    # View to return all stories (without images)
+    @action(detail=False, methods=['get'] )
+    def get_stories(self,request):
+        stories = Story.objects.values('id','title','description','difficulty_level','fulltext')
+        return Response(list(stories)) 
+    
+    # View to return easy stories (without images)
+    @action(detail=False, methods=['get'] )
+    def get_easy_stories(self,request):
+        stories = Story.objects.filter(difficulty_level='easy').values('id','title','description','difficulty_level','fulltext')
+        return Response(list(stories)) 
+    
+    # View to return medium stories (without images)
+    @action(detail=False, methods=['get'] )
+    def get_medium_stories(self,request):
+        stories = Story.objects.filter(difficulty_level='medium').values('id','title','description','difficulty_level','fulltext')
+        return Response(list(stories)) 
+
+    # View to return hard stories (without images)
+    @action(detail=False, methods=['get'] )
+    def get_hard_stories(self,request):
+        stories = Story.objects.filter(difficulty_level='hard').values('id','title','description','difficulty_level','fulltext')
+        return Response(list(stories)) 
+    
     # Return only story IDs and difficulty levels - to be categorized on main page
     @action(detail=False, methods=['get'] )
     def get_story_listings(self, request):
