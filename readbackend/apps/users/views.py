@@ -24,6 +24,7 @@ from django.contrib.auth.hashers import make_password
 from rest_framework_simplejwt.views import TokenObtainPairView
 from .serializers import CustomTokenObtainPairSerializer
 from .pronounce import get_phonetic_spelling
+from django.db.models import Count, Sum, Avg, F, Q
 
 
 class CustomTokenObtainPairView(TokenObtainPairView):
@@ -157,6 +158,49 @@ class UserViewSet(viewsets.ModelViewSet):
         user_exists = self.queryset.filter(username__iexact=username).exists()
         return Response({"exists": user_exists}, status=status.HTTP_200_OK)
 
+
+    @action(detail=False, methods=['get'])
+    def average_reading_duration(self, request):
+        avg_duration = ReadingSession.objects.aggregate(
+            avg_duration=Avg('total_reading_time')
+        )['avg_duration']
+        
+        if avg_duration:
+            return Response({"average_duration": str(avg_duration)})
+        return Response({"detail": "No reading sessions found."}, status=404)
+
+    @action(detail=False, methods=['get'])
+    def average_progress(self, request):
+        avg_progress = ReadingSession.objects.aggregate(
+            avg_progress=Avg('story_progress')
+        )['avg_progress']
+        
+        if avg_progress is not None:
+            return Response({"average_progress": avg_progress})
+        return Response({"detail": "No reading sessions found."}, status=404)
+
+    @action(detail=False, methods=['get'])
+    def average_reading_level(self, request):
+        avg_level = User.objects.filter(role='reader').aggregate(
+            avg_level=Avg('reading_level')
+        )['avg_level']
+        
+        if avg_level is not None:
+            return Response({"average_reading_level": avg_level})
+        return Response({"detail": "No reader users found."}, status=404)
+
+    @action(detail=False, methods=['get'])
+    def average_time_to_complete(self, request):
+        completed_sessions = ReadingSession.objects.filter(story_progress=100)
+        avg_time = completed_sessions.aggregate(
+            avg_time=Avg('total_reading_time')
+        )['avg_time']
+        
+        if avg_time:
+            return Response({"average_time_to_complete": str(avg_time)})
+        return Response({"detail": "No completed reading sessions found."}, status=404)
+    
+    
 # Viewset for Stories
 class StoryViewSet(viewsets.ModelViewSet):
     queryset = Story.objects.all()
@@ -223,6 +267,44 @@ class StoryViewSet(viewsets.ModelViewSet):
         return Response({'error': 'No image available for this story'}, status=status.HTTP_404_NOT_FOUND)
     
 
+    @action(detail=False, methods=['get'])
+    def most_popular(self, request):
+        story = Story.objects.annotate(
+            session_count=Count('readingsession')
+        ).order_by('-session_count').first()
+        
+        if story:
+            serializer = self.get_serializer(story)
+            data = serializer.data
+            data['session_count'] = story.session_count
+            return Response(data)
+        return Response({"detail": "No stories found."}, status=404)
+
+    @action(detail=False, methods=['get'])
+    def least_popular(self, request):
+        story = Story.objects.annotate(
+            session_count=Count('readingsession')
+        ).order_by('session_count').first()
+        
+        if story:
+            serializer = self.get_serializer(story)
+            data = serializer.data
+            data['session_count'] = story.session_count
+            return Response(data)
+        return Response({"detail": "No stories found."}, status=404)
+
+    @action(detail=False, methods=['get'])
+    def most_engaged(self, request):
+        story = Story.objects.annotate(
+            total_engagement=Sum('readingsession__total_reading_time')
+        ).order_by('-total_engagement').first()
+        
+        if story:
+            serializer = self.get_serializer(story)
+            data = serializer.data
+            data['total_engagement'] = str(story.total_engagement)  # Convert timedelta to string
+            return Response(data)
+        return Response({"detail": "No stories found."}, status=404)
         
 # Viewset for ReadingSessions
 class ReadingSessionViewSet(viewsets.ModelViewSet):
