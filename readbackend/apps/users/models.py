@@ -51,6 +51,19 @@ class ReadingSession(models.Model):
     story_progress = models.FloatField()  # e.g., percentage of story completed
     total_errors = models.IntegerField(default=0)  # Track the total number of errors
     total_reading_time = models.DurationField(default=timedelta(0))  # Track the total reading time
+    current_position = models.PositiveIntegerField(default=0)  # Add this new field
+
+    def save(self, *args, **kwargs):
+        # Update story_progress whenever the model is saved
+        if self.story:
+            self.story_progress = (self.current_position / len(self.story.fulltext)) * 100
+        super().save(*args, **kwargs)
+
+    @property
+    def calculated_progress(self):
+        if self.story:
+            return (self.current_position / len(self.story.fulltext)) * 100
+        return 0
 
     def __str__(self):
         return f'{self.user.username} - {self.story.title}'

@@ -25,6 +25,7 @@ from rest_framework_simplejwt.views import TokenObtainPairView
 from .serializers import CustomTokenObtainPairSerializer
 from .pronounce import get_phonetic_spelling
 from django.db.models import Count, Sum, Avg, F, Q
+from django.db import transaction
 
 
 class CustomTokenObtainPairView(TokenObtainPairView):
@@ -51,14 +52,19 @@ class AudioMatchView(View):
         # Perform the phoneme matching
         match_result = compare_phonemes_with_sequence_matcher(audio_file, matching_text)
 
-        if not match_result:
-            # Increment the error count if the match fails
-            session.total_errors += 1
-            session.save()
-        else:
-            # Logic for updating story progress could go here
-            # For now, we simply increment the progress by some placeholder logic
-            session.story_progress += 10.0  # Example increment (this would depend on your logic)
+        with transaction.atomic():
+            session = ReadingSession.objects.select_for_update().get(id=session_id)
+            
+            if not match_result:
+                session.total_errors += 1
+            else:
+                # Update the current position
+                current_position = session.current_position
+                next_position = current_position + len(matching_text)
+                
+                # Ensure we don't exceed the story length
+                session.current_position = min(next_position, len(session.story.fulltext))
+
             session.save()
 
         return JsonResponse({'match': match_result})
@@ -410,6 +416,32 @@ class ReadingSessionViewSet(viewsets.ModelViewSet):
             return Response({'story_id':story.id}, status=status.HTTP_200_OK)
         else:
             return Response({'error': 'No reading sessions found for this user.'}, status=status.HTTP_404_NOT_FOUND)    
+    
+    # Return the progress the user has made in their current reading session
+    @action(detail=False, methods=['get'])
+    def progress(self, request):
+        session_id = request.query_params.get('session_id')  # Fetch from query params for GET request
+        user = request.user
+        try:
+            session = ReadingSession.objects.get(id=session_id, user=user)  # Ensure session belongs to user
+            return Response({'progress': session.story_progress}, status=status.HTTP_200_OK)
+        except ReadingSession.DoesNotExist:
+            return Response({'error': 'Session not found.'}, status=status.HTTP_404_NOT_FOUND)
+    
+        # Return the current character index of current reading session
+    @action(detail=False, methods=['get'])
+    def current_position(self, request):
+        session_id = request.query_params.get('session_id')  # Fetch from query params for GET request
+        user = request.user
+        try:
+            session = ReadingSession.objects.get(id=session_id, user=user)  # Ensure session belongs to user
+            return Response({'current_position': session.current_position}, status=status.HTTP_200_OK)
+        except ReadingSession.DoesNotExist:
+            return Response({'error': 'Session not found.'}, status=status.HTTP_404_NOT_FOUND)
+        
+        
+        
+        
 
 class ClassViewSet(viewsets.ModelViewSet):
     queryset = Class.objects.all()
