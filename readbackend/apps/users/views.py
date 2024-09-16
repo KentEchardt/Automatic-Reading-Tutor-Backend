@@ -372,7 +372,6 @@ class ReadingSessionViewSet(viewsets.ModelViewSet):
         return Response({'session_id': new_session.id}, status=status.HTTP_201_CREATED)
     
     
-    # View to end a reading session
     @action(detail=False, methods=['post'], url_path='end-session')
     def end_session(self, request):
         session_id = request.data.get('session_id')
@@ -385,8 +384,34 @@ class ReadingSessionViewSet(viewsets.ModelViewSet):
 
         session.end_datetime = timezone.now()
         
+        # Update the user's reading level upon completion of a story
+        user = session.user
+        story = session.story
+        difficulty_level = story.difficulty_level
+        initial_reading_level = user.reading_level
+        story_length = len(story.fulltext)
+        
+        difficulty_multipliers = {
+            "easy": 2,
+            "medium": 4,
+            "hard": 5
+        }
+        
+        multiplier = difficulty_multipliers.get(difficulty_level, 2)  # Default to 2 if difficulty_level is not found
+
+        level_factor = 1 - (initial_reading_level / 500)  # Decreases from 1 to 0 as level approaches 500
+        word_value = (story_length / 100) * multiplier * level_factor
+        new_reading_level = min((initial_reading_level + word_value), 500)
+        user.reading_level = new_reading_level
+        user.save()
+        
         # Add the time_reading (received from frontend) to total_reading_time
-        session.total_reading_time += timedelta(seconds=int(time_reading))
+        try:
+            time_reading_seconds = int(time_reading)
+            session.total_reading_time += timedelta(seconds=time_reading_seconds)
+        except ValueError:
+            return Response({'error': 'Invalid time_reading value.'}, status=400)
+
         session.save()
 
         return Response({'message': 'Session ended and time updated successfully.'}, status=200)
