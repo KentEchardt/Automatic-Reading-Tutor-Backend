@@ -479,15 +479,19 @@ class ReadingSessionViewSet(viewsets.ModelViewSet):
     # Return the progress the user has made in a specific story
     @action(detail=False, methods=['get'])
     def progress_by_story(self, request):
-        story_id = request.query_params.get('story_id')  # Fetch from query params for GET request
-        story = Story.objects.filter(id=story_id)
+        story_id = request.query_params.get('story_id')
         user = request.user
         try:
-            session = ReadingSession.objects.get( user=user,story=story)  # Ensure session belongs to user
-            return Response({'progress': session.story_progress}, status=status.HTTP_200_OK)
-        except ReadingSession.DoesNotExist:
-            return Response({'error': 'Session not found.'}, status=status.HTTP_404_NOT_FOUND)
-    
+            story = Story.objects.get(id=story_id)  # Get a single Story object
+            session = ReadingSession.objects.filter(user=user, story=story).order_by('-start_datetime').first()
+            if session:
+                return Response({'progress': session.story_progress}, status=status.HTTP_200_OK)
+            else:
+                return Response({'error': 'No reading session found for this story.'}, status=status.HTTP_404_NOT_FOUND)
+        except Story.DoesNotExist:
+            return Response({'error': 'Story not found.'}, status=status.HTTP_404_NOT_FOUND)
+        except Exception as e:
+            return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
     
         # Return the current character index of current reading session
     @action(detail=False, methods=['get'])
