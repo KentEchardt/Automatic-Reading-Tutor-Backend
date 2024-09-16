@@ -24,7 +24,7 @@ from django.contrib.auth.hashers import make_password
 from rest_framework_simplejwt.views import TokenObtainPairView
 from .serializers import CustomTokenObtainPairSerializer
 from .pronounce import get_phonetic_spelling
-from django.db.models import Count, Sum, Avg, F, Q
+from django.db.models import Count, Sum, Avg, F, Q, OuterRef, Subquery
 from django.db import transaction
 
 
@@ -236,10 +236,32 @@ class StoryViewSet(viewsets.ModelViewSet):
         stories = Story.objects.filter(difficulty_level='hard').values('id','title','description','difficulty_level','fulltext')
         return Response(list(stories)) 
     
+
+    
     # Return only story IDs and difficulty levels - to be categorized on main page
     @action(detail=False, methods=['get'] )
     def get_story_listings(self, request):
         stories = Story.objects.values('id', 'difficulty_level')  # Fetch only 'id' and 'difficulty level' 
+        return Response(list(stories))
+    
+
+    @action(detail=False, methods=['get'])
+    def get_current_story_listings(self, request):
+        user = request.user
+        
+        # Subquery to get the latest reading session for each story
+        latest_sessions = ReadingSession.objects.filter(
+            user=user,
+        ).order_by('start_datetime')
+        
+        # Query to get stories with their latest session progress
+        stories = Story.objects.annotate(
+            latest_progress=Subquery(latest_sessions.values('story_progress')[:1])
+        ).filter(
+            readingsession__user=user,
+            latest_progress__lt=100  # Ensure progress is less than 100
+        ).distinct().values('id', 'difficulty_level')
+        
         return Response(list(stories))
     
     
@@ -395,9 +417,10 @@ class ReadingSessionViewSet(viewsets.ModelViewSet):
         user = request.user
 
         # Count the number of unique stories the user has read
-        unique_stories_count = ReadingSession.objects.filter(user=user).values('story').distinct().count()
+        unique_stories_count = ReadingSession.objects.filter(user=user,story_progress=100).values('story').distinct().count()
+        total_stories_count = Story.objects.count()
 
-        return Response({'total_stories_read': unique_stories_count}, status=status.HTTP_200_OK)
+        return Response({'total_stories_read': unique_stories_count, 'total_stories_count':total_stories_count}, status=status.HTTP_200_OK)
 
 
     @action(detail=False, methods=['get'], url_path='most-recent-story')
@@ -428,6 +451,19 @@ class ReadingSessionViewSet(viewsets.ModelViewSet):
         except ReadingSession.DoesNotExist:
             return Response({'error': 'Session not found.'}, status=status.HTTP_404_NOT_FOUND)
     
+    # Return the progress the user has made in a specific story
+    @action(detail=False, methods=['get'])
+    def progress_by_story(self, request):
+        story_id = request.query_params.get('story_id')  # Fetch from query params for GET request
+        story = Story.objects.filter(id=story_id)
+        user = request.user
+        try:
+            session = ReadingSession.objects.get( user=user,story=story)  # Ensure session belongs to user
+            return Response({'progress': session.story_progress}, status=status.HTTP_200_OK)
+        except ReadingSession.DoesNotExist:
+            return Response({'error': 'Session not found.'}, status=status.HTTP_404_NOT_FOUND)
+    
+    
         # Return the current character index of current reading session
     @action(detail=False, methods=['get'])
     def current_position(self, request):
@@ -439,6 +475,44 @@ class ReadingSessionViewSet(viewsets.ModelViewSet):
         except ReadingSession.DoesNotExist:
             return Response({'error': 'Session not found.'}, status=status.HTTP_404_NOT_FOUND)
         
+    @action(detail=False, methods = ['post'], url_path='previous-sentence')
+    def previous_sentence(self,request):
+        session_id = request.POST.get('session_id')
+        sentence = request.POST.get('sentence')
+        
+        if not session_id or not sentence:
+            return JsonResponse({'error': 'Invalid input'}, status=400)
+
+        try:
+            session = ReadingSession.objects.get(id=session_id)
+        except ReadingSession.DoesNotExist:
+            return JsonResponse({'error': 'Session not found'}, status=404)
+
+
+        with transaction.atomic():
+            session = ReadingSession.objects.select_for_update().get(id=session_id)
+            
+            # Update the current position
+            current_position = session.current_position
+            previous_position = current_position - len(sentence)
+            
+            # Ensure we don't exceed the story length
+            session.current_position = max(0, previous_position)
+
+            session.save()
+
+        return JsonResponse({'message': 'Sentence position updated successfully.'})
+
+    # Return the stories the reader is currently reading
+    @action(detail=False, methods=['get'])
+    def continue_reading(self, request):
+        user = request.user
+        try:
+            session = ReadingSession.objects.get(id=session_id, user=user)  # Ensure session belongs to user
+            return Response({'current_position': session.current_position}, status=status.HTTP_200_OK)
+        except ReadingSession.DoesNotExist:
+            return Response({'error': 'Session not found.'}, status=status.HTTP_404_NOT_FOUND)
+    
         
         
         

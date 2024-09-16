@@ -1,5 +1,6 @@
 from rest_framework import permissions
 
+# Classes for endpoint protection - allow only certain user types to access certain endpoints 
 class IsAdmin(permissions.BasePermission):
     """
     Allows access only to admin users.
