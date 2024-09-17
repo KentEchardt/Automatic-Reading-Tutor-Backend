@@ -413,8 +413,12 @@ class ReadingSessionViewSet(viewsets.ModelViewSet):
             return Response({'error': 'Invalid time_reading value.'}, status=400)
 
         session.save()
+        
+        progress = session.story_progress
+        errors = session.total_errors
+        total_reading_time = session.total_reading_time
 
-        return Response({'message': 'Session ended and time updated successfully.'}, status=200)
+        return Response({'message': 'Session ended and time updated successfully.', 'progress':progress,'errors':errors,'total_reading_time':total_reading_time,'initial_reading_level':initial_reading_level,'new_reading_level':new_reading_level}, status=200)
     
     # View to pause a reading session
     @action(detail=False, methods=['post'], url_path='pause-session')
@@ -532,15 +536,8 @@ class ReadingSessionViewSet(viewsets.ModelViewSet):
 
         return JsonResponse({'message': 'Sentence position updated successfully.'})
 
-    # Return the stories the reader is currently reading
-    @action(detail=False, methods=['get'])
-    def continue_reading(self, request):
-        user = request.user
-        try:
-            session = ReadingSession.objects.get(id=session_id, user=user)  # Ensure session belongs to user
-            return Response({'current_position': session.current_position}, status=status.HTTP_200_OK)
-        except ReadingSession.DoesNotExist:
-            return Response({'error': 'Session not found.'}, status=status.HTTP_404_NOT_FOUND)
+    
+
     
         
         
