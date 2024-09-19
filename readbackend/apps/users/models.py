@@ -12,6 +12,7 @@ class User(AbstractUser):
     )
     role = models.CharField(max_length=10, choices=ROLES)
     reading_level = models.FloatField()  # Only for Readers
+    previous_reading_level = models.FloatField()
 
     groups = models.ManyToManyField(
         'auth.Group',

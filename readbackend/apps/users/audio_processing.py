@@ -91,7 +91,7 @@ def compare_phonemes_with_sequence_matcher(audio_file, text: str, threshold=0.75
     return similarity >= threshold
 
 # Function to compare phonemes with a tolerance using Levenshtein distance
-def compare_phonemes_with_levenshtein(audio_file, text: str, tolerance=0.2) -> bool:
+def compare_phonemes_with_levenshtein(audio_file, text: str, tolerance=0.25) -> bool:
     audio_transcription = audio_to_phonemes(audio_file)
     text_phonemes = text_to_phonemes(text)
     normalized_audio_phonemes = normalize_phonemes(audio_transcription)

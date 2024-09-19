@@ -50,7 +50,8 @@ class AudioMatchView(View):
             return JsonResponse({'error': 'Session not found'}, status=404)
 
         # Perform the phoneme matching
-        match_result = compare_phonemes_with_sequence_matcher(audio_file, matching_text)
+        # match_result = compare_phonemes_with_sequence_matcher(audio_file, matching_text)
+        match_result = compare_phonemes_with_levenshtein(audio_file, matching_text)
 
         with transaction.atomic():
             session = ReadingSession.objects.select_for_update().get(id=session_id)
@@ -125,6 +126,7 @@ class UserViewSet(viewsets.ModelViewSet):
 
         # Set the reading level to 0 
         request.data['reading_level'] = 0
+        request.data['previous_reading_level'] = 0
 
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)  # Validate request data
@@ -206,6 +208,32 @@ class UserViewSet(viewsets.ModelViewSet):
             return Response({"average_time_to_complete": str(avg_time)})
         return Response({"detail": "No completed reading sessions found."}, status=404)
     
+    @action(detail=False,methods=['get'])
+    def get_user_details(self,request):
+        user=request.user
+        username = user.username
+        email=user.email
+        role=user.role
+        reading_level = user.reading_level
+        return Response({"username":username,"email":email,"reading_level":reading_level,"role":role})
+    
+    @action(detail=False, methods=['post'])
+    def change_password(self, request):
+        user = request.user
+        old_password = request.data.get('old_password')
+        new_password = request.data.get('new_password')
+
+        if not user.check_password(old_password):
+            return Response({"error": "Current password is incorrect."}, status=status.HTTP_400_BAD_REQUEST)
+
+
+        # Set the new password
+        user.set_password(new_password)
+        user.save()
+
+        return Response({"message": "Password changed successfully."}, status=status.HTTP_200_OK)
+        
+        
     
 # Viewset for Stories
 class StoryViewSet(viewsets.ModelViewSet):
@@ -235,8 +263,6 @@ class StoryViewSet(viewsets.ModelViewSet):
     def get_hard_stories(self,request):
         stories = Story.objects.filter(difficulty_level='hard').values('id','title','description','difficulty_level','fulltext')
         return Response(list(stories)) 
-    
-
     
     # Return only story IDs and difficulty levels - to be categorized on main page
     @action(detail=False, methods=['get'] )
@@ -325,7 +351,7 @@ class StoryViewSet(viewsets.ModelViewSet):
     def most_engaged(self, request):
         story = Story.objects.annotate(
             total_engagement=Sum('readingsession__total_reading_time')
-        ).order_by('-total_engagement').first()
+        ).order_by('total_engagement').first()
         
         if story:
             serializer = self.get_serializer(story)
@@ -334,6 +360,40 @@ class StoryViewSet(viewsets.ModelViewSet):
             return Response(data)
         return Response({"detail": "No stories found."}, status=404)
         
+    @action(detail=True, methods=['put'])
+    def update_story(self, request, pk=None):
+        try:
+            story = self.get_object()  # Get the story instance
+        except Story.DoesNotExist:
+            return Response({'error': 'Story not found.'}, status=status.HTTP_404_NOT_FOUND)
+
+        # Extract the fields from request data
+        title = request.data.get('title')
+        description = request.data.get('description')
+        fulltext = request.data.get('fulltext')
+        difficulty_level = request.data.get('difficulty_level')
+        image = request.FILES.get('image')  # Handle image file separately
+
+        # Validate required fields
+        if not title or not description or not fulltext or not difficulty_level:
+            return Response({'error': 'All fields are required.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Perform the update
+        with transaction.atomic():
+            story.title = title
+            story.description = description
+            story.fulltext = fulltext
+            story.difficulty_level = difficulty_level
+
+            if image:
+                story.image = image  # Update image if provided
+
+            story.save()
+
+        # Return updated story data
+        serializer = self.get_serializer(story)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+    
 # Viewset for ReadingSessions
 class ReadingSessionViewSet(viewsets.ModelViewSet):
     queryset = ReadingSession.objects.all()
@@ -402,6 +462,7 @@ class ReadingSessionViewSet(viewsets.ModelViewSet):
         level_factor = 1 - (initial_reading_level / 500)  # Decreases from 1 to 0 as level approaches 500
         word_value = (story_length / 100) * multiplier * level_factor
         new_reading_level = min((initial_reading_level + word_value), 500)
+        user.previous_reading_level = initial_reading_level
         user.reading_level = new_reading_level
         user.save()
         
@@ -414,12 +475,32 @@ class ReadingSessionViewSet(viewsets.ModelViewSet):
 
         session.save()
         
-        progress = session.story_progress
-        errors = session.total_errors
-        total_reading_time = session.total_reading_time
 
-        return Response({'message': 'Session ended and time updated successfully.', 'progress':progress,'errors':errors,'total_reading_time':total_reading_time,'initial_reading_level':initial_reading_level,'new_reading_level':new_reading_level}, status=200)
+        return Response({'message': 'Session ended and time updated successfully.'}, status=200)
     
+    @action(detail=False, methods=['get'], url_path='session-stats')
+    def session_stats(self, request):
+        session_id = request.query_params.get('session_id')  # Use query_params for GET request
+        try:
+            session = ReadingSession.objects.get(id=session_id)
+        except ReadingSession.DoesNotExist:
+            return Response({'error': 'Session not found.'}, status=404)
+        
+        user = session.user
+        new_reading_level = user.reading_level
+        initial_reading_level = user.previous_reading_level  # Set based on your logic
+        total_reading_time = session.total_reading_time
+        errors = session.total_errors
+        progress = session.story_progress
+
+        return Response({
+            'progress': progress,
+            'errors': errors,
+            'total_reading_time': total_reading_time,
+            'initial_reading_level': initial_reading_level,
+            'new_reading_level': new_reading_level
+        })
+        
     # View to pause a reading session
     @action(detail=False, methods=['post'], url_path='pause-session')
     def pause_session(self, request):
@@ -451,24 +532,24 @@ class ReadingSessionViewSet(viewsets.ModelViewSet):
 
         return Response({'total_stories_read': unique_stories_count, 'total_stories_count':total_stories_count}, status=status.HTTP_200_OK)
 
-
     @action(detail=False, methods=['get'], url_path='most-recent-story')
     def most_recent_story(self, request):
         """
-        Endpoint to return the most recent story read by the authenticated user.
+        Endpoint to return the most recent story read by the authenticated user, 
+        excluding sessions with an end_datetime.
         """
         user = request.user
 
-        # Get the most recent reading session for the user
-        latest_session = ReadingSession.objects.filter(user=user).order_by('-start_datetime').first()
+        # Get the most recent reading session where end_datetime is None
+        latest_session = ReadingSession.objects.filter(user=user, end_datetime__isnull=True).order_by('-start_datetime').first()
 
         if latest_session:
             # Retrieve the story associated with the latest session
             story = get_object_or_404(Story, id=latest_session.story.id)
-            return Response({'story_id':story.id}, status=status.HTTP_200_OK)
+            return Response({'story_id': story.id}, status=status.HTTP_200_OK)
         else:
-            return Response({'error': 'No reading sessions found for this user.'}, status=status.HTTP_404_NOT_FOUND)    
-    
+            return Response({'error': 'No reading sessions found for this user.'}, status=status.HTTP_404_NOT_FOUND)
+
     # Return the progress the user has made in their current reading session
     @action(detail=False, methods=['get'])
     def progress(self, request):
@@ -537,11 +618,6 @@ class ReadingSessionViewSet(viewsets.ModelViewSet):
         return JsonResponse({'message': 'Sentence position updated successfully.'})
 
     
-
-    
-        
-        
-        
 
 class ClassViewSet(viewsets.ModelViewSet):
     queryset = Class.objects.all()
