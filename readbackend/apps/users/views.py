@@ -74,15 +74,15 @@ class AudioMatchView(View):
 @method_decorator(csrf_exempt, name='dispatch')
 class PronunciationView(View):
     
-    def post(self,request):
+    def post(self, request):
         mispronounced_text = request.POST.get('mispronounced_text')
         
-        if not(mispronounced_text) or mispronounced_text=="":
+        if not mispronounced_text:
             return JsonResponse({'error': 'Invalid input'}, status=400)
         
         correct_pronunciation = get_phonetic_spelling(mispronounced_text)
         
-        return JsonResponse({'correct_pronunciation':correct_pronunciation})
+        return JsonResponse({'correct_pronunciation': correct_pronunciation})
 
 # Viewsets - views & endpoints for all models 
 
