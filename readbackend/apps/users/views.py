@@ -1,4 +1,3 @@
-
 from django.http import JsonResponse
 from django.views import View
 from django.views.decorators.csrf import csrf_exempt
@@ -14,19 +13,16 @@ from rest_framework import status
 import base64
 import mimetypes
 from django.utils import timezone
-
 from datetime import timedelta
 from .permissions import IsAdmin, IsTeacher, IsReader
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from django.contrib.auth.hashers import make_password
-
-
 from rest_framework_simplejwt.views import TokenObtainPairView
 from .serializers import CustomTokenObtainPairSerializer
 from .pronounce import get_phonetic_spelling
 from django.db.models import Count, Sum, Avg, F, Q, OuterRef, Subquery
 from django.db import transaction
-
+from django.utils.crypto import get_random_string
 
 class CustomTokenObtainPairView(TokenObtainPairView):
     serializer_class = CustomTokenObtainPairSerializer
@@ -625,7 +621,104 @@ class ReadingSessionViewSet(viewsets.ModelViewSet):
 class ClassViewSet(viewsets.ModelViewSet):
     queryset = Class.objects.all()
     serializer_class = ClassSerializer
+    
 
+class ClassViewSet(viewsets.ModelViewSet):
+    queryset = Class.objects.all()
+    serializer_class = ClassSerializer
+    
+    @action(detail=False, methods=["post"])
+    def create_class(self,request):
+        # Generate a unique class code
+        class_code = get_random_string(length=8, allowed_chars='ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789')
+        
+        # Create and save the new class
+        serializer = ClassSerializer(data={'class_code': class_code, 'teacher': request.user.id})
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        
+    @action(detail=False, methods=['get'])
+    def get_students(self, request):
+        teacher = request.user
+        
+        # Ensure the user is a teacher
+        if (teacher.role!='teacher'): 
+            return Response({'error': 'You are not authorized to view students.'}, status=status.HTTP_403_FORBIDDEN)
+        
+        # Get all classes taught by this teacher
+        classes = Class.objects.filter(teacher=teacher)
+        
+        # Get all students in these classes
+        students = Student.objects.filter(class_code__in=classes)
+        
+        # Prepare data for response
+        student_data = []
+        for student in students:
+            student_data.append({
+                'username': student.reader.username,
+                'class_code': student.class_code.class_code,  # Change to 'class_code' if you prefer ID
+                'reading_level': student.reader.reading_level  # Adjust if the reading level is stored elsewhere
+            })
+        
+        return Response({'students': student_data})
+    
+    @action(detail=False, methods=['get'])
+    def get_classes(self, request):
+        teacher = request.user
+        
+        # Ensure the user is a teacher
+        if teacher.role != 'teacher': 
+            return Response({'error': 'You are not authorized to view classes.'}, status=status.HTTP_403_FORBIDDEN)
+        
+        # Get all classes taught by this teacher
+        classes = Class.objects.filter(teacher=teacher)
+        
+        # Prepare data for response
+        class_data = []
+        for studentclass in classes:
+            numstudents = Student.objects.filter(class_code=studentclass).count()
+            class_data.append({
+                'class_code': studentclass.class_code,  # Missing comma added here
+                'num_students': numstudents
+            })
+        
+        return Response({'classes': class_data})
+    
 class StudentViewSet(viewsets.ModelViewSet):
     queryset = Student.objects.all()
     serializer_class = StudentSerializer
+    
+        
+    @action(detail=False, methods=["post"])
+    def join_class(self, request):
+        class_code = request.data.get('class_code')
+        if not class_code:
+            return Response({"error": "Class code is required"}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            # Get the class instance by the class code
+            class_instance = Class.objects.get(class_code=class_code)
+
+            # Check if the student is already in the class
+            existing_student = Student.objects.filter(class_code=class_instance, reader=request.user).first()
+
+            # If the student is already in the class, return a message indicating this
+            if existing_student:
+                return Response({"message": "You are already enrolled in this class"}, status=status.HTTP_200_OK)
+
+            # If not, create a new student entry
+            student = Student.objects.create(class_code=class_instance, reader=request.user)
+
+            # Serialize the newly created student
+            serializer = self.get_serializer(student)
+            return Response({"message": "Class joined successfully!"},serializer.data, status=status.HTTP_201_CREATED)
+
+        # If class is not found, return an error
+        except Class.DoesNotExist:
+            return Response({"error": "Class not found"}, status=status.HTTP_404_NOT_FOUND)
+
+        # Catch any other exceptions and return a 400 error
+        except Exception as e:
+            return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)

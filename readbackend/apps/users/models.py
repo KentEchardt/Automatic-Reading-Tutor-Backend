@@ -72,7 +72,7 @@ class ReadingSession(models.Model):
 # Class model and Student model- store relations between Teachers and Readers (a Reader is in a Teacher's class)
 class Class(models.Model):
     teacher = models.ForeignKey(User, on_delete=models.CASCADE, limit_choices_to={'role': 'teacher'})
-    class_code = models.CharField(max_length=20, unique=True)
+    class_code = models.CharField(max_length=20, unique=True)   
 
     def __str__(self):
         return self.class_code
