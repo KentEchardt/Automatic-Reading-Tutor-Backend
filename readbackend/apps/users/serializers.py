@@ -14,7 +14,7 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
 class UserSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
-        fields = ['id', 'username', 'password', 'email', 'role', 'reading_level','date_joined']
+        fields = ['id', 'username', 'password', 'email', 'role', 'reading_level','date_joined','previous_reading_level']
         extra_kwargs = {
             'reading_level': {'required': False},  # Optional 
             'password': {'write_only': True}  # Ensure password is write-only

@@ -13,10 +13,13 @@ processor = Wav2Vec2Processor.from_pretrained(model_name)
 
 
 # Function to convert text to phonemes using eSpeak
-def text_to_phonemes(text: str, language: str = "en-us") -> str: #Found that US english was best 
-    command = f'espeak-ng -v{language} --ipa=1 -q "{text}"'  # Added -q to suppress audio playback
-    process = subprocess.Popen(command, stdout=subprocess.PIPE, shell=True)
-    output, _ = process.communicate()
+def text_to_phonemes(text: str, language: str = "en-us") -> str:
+    command = ['espeak-ng', f'-v{language}', '--ipa=1', '-q', text]
+    process = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    output, error = process.communicate()
+
+    if error:
+        print("Error in eSpeak execution:", error.decode("utf-8"))
     phonemes = output.decode("utf-8").strip()
     print("Text Phonemes:", phonemes)
     return phonemes

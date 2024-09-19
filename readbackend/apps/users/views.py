@@ -275,18 +275,21 @@ class StoryViewSet(viewsets.ModelViewSet):
     def get_current_story_listings(self, request):
         user = request.user
         
-        # Subquery to get the latest reading session for each story
+        # Subquery to get the latest active reading session for each story
         latest_sessions = ReadingSession.objects.filter(
             user=user,
-        ).order_by('start_datetime')
+            story=OuterRef('pk'),
+            end_datetime__isnull=True
+        ).order_by('-start_datetime')
         
-        # Query to get stories with their latest session progress
+        # Query to get stories with their latest active session progress
         stories = Story.objects.annotate(
-            latest_progress=Subquery(latest_sessions.values('story_progress')[:1])
+            latest_progress=Subquery(latest_sessions.values('story_progress')[:1]),
+            session_id=Subquery(latest_sessions.values('id')[:1])
         ).filter(
-            readingsession__user=user,
+            session_id__isnull=False,  # Ensure there's an active session
             latest_progress__lt=100  # Ensure progress is less than 100
-        ).distinct().values('id', 'difficulty_level')
+        ).values('id', 'difficulty_level', 'latest_progress', 'session_id')
         
         return Response(list(stories))
     
