@@ -351,7 +351,7 @@ class StoryViewSet(viewsets.ModelViewSet):
     def most_engaged(self, request):
         story = Story.objects.annotate(
             total_engagement=Sum('readingsession__total_reading_time')
-        ).order_by('total_engagement').first()
+        ).order_by('-total_engagement').first()
         
         if story:
             serializer = self.get_serializer(story)
