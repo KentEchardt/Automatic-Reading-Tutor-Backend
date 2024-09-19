@@ -1,3 +1,5 @@
+'''Serializers for each model - used in creation and parsing of models'''
+
 from rest_framework import serializers
 from .models import User, Story, ReadingSession, Class, Student
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer

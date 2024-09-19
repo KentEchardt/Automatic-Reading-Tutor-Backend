@@ -1,3 +1,5 @@
+'''Views - all endpoints and functions for performing backend operations'''
+
 from django.http import JsonResponse
 from django.views import View
 from django.views.decorators.csrf import csrf_exempt
@@ -116,7 +118,7 @@ class UserViewSet(viewsets.ModelViewSet):
         user = request.user
         return Response({'reading_level': user.reading_level})
     
-    
+    #Endpoint to create a new user
     def create(self, request, *args, **kwargs):
         role = request.data.get('role')
 
@@ -132,7 +134,7 @@ class UserViewSet(viewsets.ModelViewSet):
         return Response(serializer.data, status=status.HTTP_201_CREATED)
 
 
-
+    '''Endpoints to return specific users'''
     @action(detail=False)
     def admins(self, request):
         admins = self.queryset.filter(role='admin')
@@ -151,18 +153,20 @@ class UserViewSet(viewsets.ModelViewSet):
         serializer = self.get_serializer(readers, many=True)
         return Response(serializer.data)
 
+    # Get a user by username
     @action(detail=True, url_path=r'by-username/(?P<username>\w+)')
     def get_by_username(self, request, username=None):
         user = self.queryset.filter(username=username).first()
         serializer = self.get_serializer(user)
         return Response(serializer.data)
     
+    # Check a user exists in the database
     @action(detail=False, url_path=r'check-username/(?P<username>\w+)')
     def check_username_exists(self, request, username=None):
         user_exists = self.queryset.filter(username__iexact=username).exists()
         return Response({"exists": user_exists}, status=status.HTTP_200_OK)
 
-
+    # Get the average reading duration of all users
     @action(detail=False, methods=['get'])
     def average_reading_duration(self, request):
         avg_duration = ReadingSession.objects.aggregate(
@@ -173,6 +177,7 @@ class UserViewSet(viewsets.ModelViewSet):
             return Response({"average_duration": str(avg_duration)})
         return Response({"detail": "No reading sessions found."}, status=404)
 
+    # Get the average story progress of all users
     @action(detail=False, methods=['get'])
     def average_progress(self, request):
         avg_progress = ReadingSession.objects.aggregate(
@@ -183,6 +188,7 @@ class UserViewSet(viewsets.ModelViewSet):
             return Response({"average_progress": avg_progress})
         return Response({"detail": "No reading sessions found."}, status=404)
 
+    # Get the average reading level of all users
     @action(detail=False, methods=['get'])
     def average_reading_level(self, request):
         avg_level = User.objects.filter(role='reader').aggregate(
@@ -193,6 +199,7 @@ class UserViewSet(viewsets.ModelViewSet):
             return Response({"average_reading_level": avg_level})
         return Response({"detail": "No reader users found."}, status=404)
 
+    # Get the average time to complete a story of all users
     @action(detail=False, methods=['get'])
     def average_time_to_complete(self, request):
         completed_sessions = ReadingSession.objects.filter(story_progress=100)
@@ -204,6 +211,7 @@ class UserViewSet(viewsets.ModelViewSet):
             return Response({"average_time_to_complete": str(avg_time)})
         return Response({"detail": "No completed reading sessions found."}, status=404)
     
+    # Get user role, email, username and reading level - to display in user profile 
     @action(detail=False,methods=['get'])
     def get_user_details(self,request):
         user=request.user
@@ -213,6 +221,7 @@ class UserViewSet(viewsets.ModelViewSet):
         reading_level = user.reading_level
         return Response({"username":username,"email":email,"reading_level":reading_level,"role":role})
     
+    # Change a user's password
     @action(detail=False, methods=['post'])
     def change_password(self, request):
         user = request.user
@@ -266,7 +275,7 @@ class StoryViewSet(viewsets.ModelViewSet):
         stories = Story.objects.values('id', 'difficulty_level')  # Fetch only 'id' and 'difficulty level' 
         return Response(list(stories))
     
-
+    # Return the stories a user is currently reading 
     @action(detail=False, methods=['get'])
     def get_current_story_listings(self, request):
         user = request.user
@@ -319,7 +328,7 @@ class StoryViewSet(viewsets.ModelViewSet):
                 return Response({'error': 'Image not found'}, status=status.HTTP_404_NOT_FOUND)
         return Response({'error': 'No image available for this story'}, status=status.HTTP_404_NOT_FOUND)
     
-
+    # Return the most popular story - most views
     @action(detail=False, methods=['get'])
     def most_popular(self, request):
         story = Story.objects.annotate(
@@ -333,6 +342,7 @@ class StoryViewSet(viewsets.ModelViewSet):
             return Response(data)
         return Response({"detail": "No stories found."}, status=404)
 
+    # Return the least popular story - least views
     @action(detail=False, methods=['get'])
     def least_popular(self, request):
         story = Story.objects.annotate(
@@ -346,6 +356,7 @@ class StoryViewSet(viewsets.ModelViewSet):
             return Response(data)
         return Response({"detail": "No stories found."}, status=404)
 
+    # Return the most engaged story - most total time reading
     @action(detail=False, methods=['get'])
     def most_engaged(self, request):
         story = Story.objects.annotate(
@@ -358,7 +369,8 @@ class StoryViewSet(viewsets.ModelViewSet):
             data['total_engagement'] = str(story.total_engagement)  # Convert timedelta to string
             return Response(data)
         return Response({"detail": "No stories found."}, status=404)
-        
+     
+    # Update a story's data   
     @action(detail=True, methods=['put'])
     def update_story(self, request, pk=None):
         try:
@@ -430,7 +442,7 @@ class ReadingSessionViewSet(viewsets.ModelViewSet):
 
         return Response({'session_id': new_session.id}, status=status.HTTP_201_CREATED)
     
-    
+    # End a reading session - set the end_datetime
     @action(detail=False, methods=['post'], url_path='end-session')
     def end_session(self, request):
         session_id = request.data.get('session_id')
@@ -477,6 +489,7 @@ class ReadingSessionViewSet(viewsets.ModelViewSet):
 
         return Response({'message': 'Session ended and time updated successfully.'}, status=200)
     
+    # Return some statistics about a user's experience reading a story - errors, total reading time, and reading level before and after reading the story
     @action(detail=False, methods=['get'], url_path='session-stats')
     def session_stats(self, request):
         session_id = request.query_params.get('session_id')  # Use query_params for GET request
@@ -588,6 +601,7 @@ class ReadingSessionViewSet(viewsets.ModelViewSet):
         except ReadingSession.DoesNotExist:
             return Response({'error': 'Session not found.'}, status=status.HTTP_404_NOT_FOUND)
         
+    # Set a user back a sentence in the current session
     @action(detail=False, methods = ['post'], url_path='previous-sentence')
     def previous_sentence(self,request):
         session_id = request.POST.get('session_id')
@@ -622,11 +636,7 @@ class ClassViewSet(viewsets.ModelViewSet):
     queryset = Class.objects.all()
     serializer_class = ClassSerializer
     
-
-class ClassViewSet(viewsets.ModelViewSet):
-    queryset = Class.objects.all()
-    serializer_class = ClassSerializer
-    
+    # Function to allow a teacher to create a class
     @action(detail=False, methods=["post"])
     def create_class(self,request):
         # Generate a unique class code
@@ -638,7 +648,8 @@ class ClassViewSet(viewsets.ModelViewSet):
             serializer.save()
             return Response(serializer.data, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-        
+    
+    # Return all a teacher's students
     @action(detail=False, methods=['get'])
     def get_students(self, request):
         teacher = request.user
@@ -664,6 +675,7 @@ class ClassViewSet(viewsets.ModelViewSet):
         
         return Response({'students': student_data})
     
+    # Return all a teacher's classes
     @action(detail=False, methods=['get'])
     def get_classes(self, request):
         teacher = request.user
@@ -690,7 +702,7 @@ class StudentViewSet(viewsets.ModelViewSet):
     queryset = Student.objects.all()
     serializer_class = StudentSerializer
     
-        
+    # Function to allow a reader to join a class   
     @action(detail=False, methods=["post"])
     def join_class(self, request):
         class_code = request.data.get('class_code')
@@ -713,7 +725,10 @@ class StudentViewSet(viewsets.ModelViewSet):
 
             # Serialize the newly created student
             serializer = self.get_serializer(student)
-            return Response({"message": "Class joined successfully!"},serializer.data, status=status.HTTP_201_CREATED)
+            return Response({
+                "message": "Class joined successfully!",
+                "data": serializer.data
+            }, status=status.HTTP_201_CREATED)
 
         # If class is not found, return an error
         except Class.DoesNotExist:
